@@ -3,7 +3,7 @@ import re
 
 E = re.compile(r'^([^ /=]+),$')
 
-class JSCAnalyser:
+class JSCAnalyzer:
     def __init__(self, fpath):
         with open(fpath, 'r') as f:
             self.lines_ = f.readlines()
@@ -233,7 +233,7 @@ def get_v8_map_dict():
     return analyzer.process()
 
 def get_jsc_js_type_dict():
-    fpath = '/home/z/Projects/open/safari-604-branch/Source/JavaScriptCore/runtime/JSType.h'
+    fpath = '/home/z/Projects/open/jsc/Source/JavaScriptCore/runtime/JSType.h'
     analyzer = JSCAnalyzer(fpath)
     return analyzer.process()
 
