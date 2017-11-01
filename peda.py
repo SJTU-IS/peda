@@ -34,7 +34,7 @@ try:
 except ImportError:
     import pickle
 
-
+from myutils import get_v8_map_dict, get_jsc_js_type_dict
 
 from skeleton import *
 from shellcode import *
@@ -3043,6 +3043,8 @@ class PEDACmd(object):
     def __init__(self):
         # list of all available commands
         self.commands = [c for c in dir(self) if callable(getattr(self, c)) and not c.startswith("_")]
+        self.v8_map_dict_ = get_v8_map_dict()
+        self.jsc_js_type_dict_ = get_jsc_js_type_dict()
 
     ##################
     #   Misc Utils   #
@@ -4630,6 +4632,78 @@ class PEDACmd(object):
             msg("XORed data (first 32 bytes):")
             msg('"' + to_hexstr(result[:32]) + '"')
         return
+
+    # jsc_checkobj()
+    def jsc_checkobj(self, *arg):
+        """
+        Check the type of the object at arg[0]; size (arg[1]) is optional
+        Usage:
+            MYNAME address[, size]
+        """
+        (address, size) = normalize_argv(arg, 2)
+
+        if address is None:
+            self._missing_argument()
+            return
+        address = to_int(address)
+        if address == None:
+            address = gdb.parse_and_eval(address)
+
+        if size is None:
+            size = 12
+        else:
+            size = int(size)
+
+        (arch, bits) = peda.getarch()
+        if bits == 64:
+            text = peda.execute_redirect("x/{}xg {}".format(size, address)).strip()
+            cell = text.split("0x")[2].strip()
+            idx = int(cell[4:6], 16)
+        elif bits == 32:
+            text = peda.execute_redirect("x/{}xw {}".format(size, address)).strip()
+            cell = text.split("0x")[3].strip()
+            idx = int(cell[4:6], 16)
+        _type = self.jsc_js_type_dict_.get(idx, "NON_JS_TYPE")
+        text = "Type: {}\n{}".format(yellow(_type), text)
+        msg(text)
+
+    # v8_checkobj()
+    def v8_checkobj(self, *arg):
+        """
+        Check the type of the object at arg[0]; size (arg[1]) is optional
+        Usage:
+            MYNAME address[, size]
+        """
+        (address, size) = normalize_argv(arg, 2)
+
+        if address is None:
+            self._missing_argument()
+            return
+        else:
+            address = to_int(address)
+            if address == None:
+                address = gdb.parse_and_eval(address)
+            if address & 1:
+                address -= 1
+
+        if size is None:
+            size = 12
+        else:
+            size = int(size)
+
+        (arch, bits) = peda.getarch()
+        if bits == 64:
+            text = peda.execute_redirect("x/{}xg {}".format(size, address)).strip()
+            map = int(text.split("0x")[2], 16)
+            obj_type = peda.execute_redirect("x/c {}".format(map+11)).strip()
+        else:
+            text = peda.execute_redirect("x/{}xw {}".format(size, address)).strip()
+            map = int(text.split("0x")[2], 16)
+            obj_type = peda.execute_redirect("x/c {}".format(map+7)).strip()
+        idx = int(obj_type.split(':')[1].strip(), 16)
+        map_info = 'Map : %s, Type: %s\n' % (hex(map), self.v8_map_dict_[idx])
+        text = yellow(map_info) + text
+        msg(text)
 
     # searchmem(), searchmem_by_range()
     def searchmem(self, *arg):
