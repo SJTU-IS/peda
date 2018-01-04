@@ -3043,8 +3043,9 @@ class PEDACmd(object):
     def __init__(self):
         # list of all available commands
         self.commands = [c for c in dir(self) if callable(getattr(self, c)) and not c.startswith("_")]
-        self.v8_map_dict_ = get_v8_map_dict()
-        self.jsc_js_type_dict_ = get_jsc_js_type_dict()
+        self.target_v8 = False
+        self.target_jsc = False
+        self.target_ff = False
 
     ##################
     #   Misc Utils   #
@@ -4640,6 +4641,13 @@ class PEDACmd(object):
         Usage:
             MYNAME address[, size]
         """
+        if not self.target_jsc:
+            try:
+                self.jsc_js_type_dict_ = get_jsc_js_type_dict()
+                self.target_jsc = True
+            except:
+                msg("please check your jsc path")
+                return
         (address, size) = normalize_argv(arg, 2)
 
         if address is None:
@@ -4674,6 +4682,14 @@ class PEDACmd(object):
         Usage:
             MYNAME address[, size]
         """
+        if not self.target_v8:
+            try:
+                self.v8_map_dict_ = get_v8_map_dict()
+                self.target_v8 = True
+            except:
+                msg("please check your v8 path")
+                return
+
         (address, size) = normalize_argv(arg, 2)
 
         if address is None:
