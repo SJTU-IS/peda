@@ -1724,8 +1724,12 @@ class PEDA(object):
         if not intsize:
             intsize = self.intsize()
         value = self.readmem(address, intsize)
-        import struct
-        value = struct.unpack('<Q', value)[0]
+        if isinstance(value, str):
+            value = str.encode(encoding='utf-8')
+        if intsize == 4:
+            value = struct.unpack('<I', value)[0]
+        elif intsize == 8:
+            value = struct.unpack('<Q', value)[0]
         if value:
             #value = to_int("0x" + codecs.encode(value[::-1], 'hex'))
             return value
@@ -4665,8 +4669,28 @@ class PEDACmd(object):
         result = peda.execute_redirect(cmd).strip()
         return to_int(result.split(":")[0])
 
-    # ff_checkobj()
-    def ff_checkobj(self, *arg):
+    def fftrailer(self, *arg):
+        """
+        Get trailer
+        Usage:
+            MYNAME address[, size]
+        """
+        (arch, bits) = peda.getarch()
+        if bits != 64:
+            return
+
+        (value, size) = normalize_argv(arg, 2)
+        if not value:
+            self._missing_argument()
+            return
+
+        addr = value&(~0xfffff)|0xfffe8
+        cmd = "p *(gc::ChunkTrailer*){:#x}".format(addr)
+        text = peda.execute_redirect(cmd).strip()
+        msg(text)
+
+    # ffobj()
+    def ffobj(self, *arg):
         """
         Check the type of the Value* at arg[0]; size (arg[1]) is optional
         Usage:
@@ -4682,6 +4706,9 @@ class PEDACmd(object):
             return
 
         size = 12 if not size else int(size)
+
+        if not (value&0xffff000000000000):
+            value |= 0xfffe000000000000
 
         if (value|0x8000000000000000)<=0xfff80000ffffffff:
             _type = "DOUBLE"
