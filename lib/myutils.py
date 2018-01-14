@@ -237,12 +237,17 @@ def get_jsc_js_type_dict():
     analyzer = JSCAnalyzer(fpath)
     return analyzer.process()
 
-RE_FF_CLASS = re.compile(r'<js::([^:]+)::class_>')
-def get_ff_class(s):
-    result = RE_FF_CLASS.search(s)
-    if not result:
-        return None
-    return result.group(1)
+FF_TYPES = [
+    "DOUBLE", "INT", "UNDEFINED", "NULL",
+    "BOOLEAN", "MAGIC", "STRING", "SYMBOL",
+    "PRIVATE_GCTHING", "UNEXPECTED", "UNEXPECTED", "UNEXPECTED",
+    "OBJECT"
+]
+def get_ff_type(tag):
+    try:
+        return FF_TYPES[index]
+    except IndexError:
+        return "UNKNOWN"
 
 if __name__ == '__main__':
     fpath = '/home/z/projects/open/v8/v8/src/objects.h'
