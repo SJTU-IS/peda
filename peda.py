@@ -34,7 +34,7 @@ try:
 except ImportError:
     import pickle
 
-from myutils import get_v8_map_dict, get_jsc_js_type_dict
+from myutils import get_v8_map_dict, get_jsc_js_type_dict, get_ff_type
 
 from skeleton import *
 from shellcode import *
@@ -1724,8 +1724,14 @@ class PEDA(object):
         if not intsize:
             intsize = self.intsize()
         value = self.readmem(address, intsize)
+        if isinstance(value, str):
+            value = str.encode(encoding='utf-8')
+        if intsize == 4:
+            value = struct.unpack('<I', value)[0]
+        elif intsize == 8:
+            value = struct.unpack('<Q', value)[0]
         if value:
-            value = to_int("0x" + codecs.encode(value[::-1], 'hex'))
+            #value = to_int("0x" + codecs.encode(value[::-1], 'hex'))
             return value
         else:
             return None
@@ -4634,6 +4640,109 @@ class PEDACmd(object):
             msg('"' + to_hexstr(result[:32]) + '"')
         return
 
+    def read_ptr(self, *arg):
+        """
+        Helper method: read a pointer from arg[0]
+        Usage:
+            MYNAME address
+        """
+        (address,) = normalize_argv(arg, 1)
+        if not address:
+            self._missing_argument()
+            return
+        address = self.expr2addr(address)
+        text = peda.execute_redirect("x/xg {:#x}".format(address)).strip()
+        return int(text.split("0x")[2], 16)
+
+    def expr2addr(self, expr):
+        """
+        Check the type of the Value* at arg[0]; size (arg[1]) is optional
+        Usage:
+            MYNAME address[, size]
+        """
+        maybe = to_int(expr)
+        if maybe:
+            return maybe
+        # don't use gdb.parse_and_eval(), because it might return string,
+        # e.g. <xx at 0xDEADBEEF>
+        cmd = "x/b {}".format(expr)
+        result = peda.execute_redirect(cmd).strip()
+        return to_int(result.split(":")[0])
+
+    def fftrailer(self, *arg):
+        """
+        Get trailer
+        Usage:
+            MYNAME address[, size]
+        """
+        (arch, bits) = peda.getarch()
+        if bits != 64:
+            return
+
+        (value, size) = normalize_argv(arg, 2)
+        if not value:
+            self._missing_argument()
+            return
+
+        addr = value&(~0xfffff)|0xfffe8
+        cmd = "p *(gc::ChunkTrailer*){:#x}".format(addr)
+        text = peda.execute_redirect(cmd).strip()
+        msg(text)
+
+    # ffobj()
+    def ffobj(self, *arg):
+        """
+        Check the type of the Value* at arg[0]; size (arg[1]) is optional
+        Usage:
+            MYNAME address[, size]
+        """
+        (arch, bits) = peda.getarch()
+        if bits != 64:
+            return
+
+        (value, size) = normalize_argv(arg, 2)
+        if not value:
+            self._missing_argument()
+            return
+
+        size = 12 if not size else int(size)
+
+        if not (value&0xffff000000000000):
+            value |= 0xfffe000000000000
+
+        if (value|0x8000000000000000)<=0xfff80000ffffffff:
+            _type = "DOUBLE"
+            content = struct.unpack("d",
+                struct.pack("<Q", value))[0]
+        else:
+            tag = ((value>>47)&0xf)
+            if tag == 1:
+                _type = "INT"
+                n = struct.unpack("i",
+                    struct.pack("<I", value&0xffffffff))[0]
+                content = "{}: {:#x}".format(n, n)
+            elif tag == 6:
+                _type = "STRING"
+                str_addr = (value&0x7fffffffffff)
+                content = "i am a string"
+            elif tag != 12:
+                _type = get_ff_type(tag)
+                content = ""
+            else:# JSObject
+                addr   = (value & 0xffffffffffff)
+                group_ = peda.read_long(addr)
+                clasp_ = peda.read_long(group_)
+                name   = peda.read_long(clasp_)
+
+                text = peda.execute_redirect("x/s {:#x}".format(name))
+                _type = text.split()[-1].strip("\"")
+
+                cmd = "x/{}xg {:#x}".format(size, addr)
+                content = peda.execute_redirect(cmd).strip()
+
+        text = "Type: {}\n{}".format(yellow(_type), content)
+        msg(text)
+
     # jsc_checkobj()
     def jsc_checkobj(self, *arg):
         """
@@ -4650,14 +4759,13 @@ class PEDACmd(object):
                 return
         (address, size) = normalize_argv(arg, 2)
 
-        if address is None:
+        if not address:
             self._missing_argument()
             return
-        address = to_int(address)
-        if address == None:
-            address = gdb.parse_and_eval(address)
 
-        if size is None:
+        address = self.expr2addr(address)
+
+        if not size:
             size = 12
         else:
             size = int(size)
@@ -4692,17 +4800,15 @@ class PEDACmd(object):
 
         (address, size) = normalize_argv(arg, 2)
 
-        if address is None:
+        if not address:
             self._missing_argument()
             return
         else:
-            address = to_int(address)
-            if address == None:
-                address = gdb.parse_and_eval(address)
+            address = self.expr2addr(address)
             if address & 1:
                 address -= 1
 
-        if size is None:
+        if not size:
             size = 12
         else:
             size = int(size)

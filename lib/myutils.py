@@ -228,17 +228,29 @@ class V8Analyzer:
         }
 
 def get_v8_map_dict():
-    fpath = '/home/z/Projects/open/v8/v8/src/objects.h'
+    fpath = '/home/z/projects/open/v8/v8/src/objects.h'
     analyzer = V8Analyzer(fpath)
     return analyzer.process()
 
 def get_jsc_js_type_dict():
-    fpath = '/home/z/Projects/open/safari-604-branch/Source/JavaScriptCore/runtime/JSType.h'
+    fpath = '/home/z/projects/open/safari-604-branch/Source/JavaScriptCore/runtime/JSType.h'
     analyzer = JSCAnalyzer(fpath)
     return analyzer.process()
 
+FF_TYPES = [
+    "DOUBLE", "INT", "UNDEFINED", "NULL",
+    "BOOLEAN", "MAGIC", "STRING", "SYMBOL",
+    "PRIVATE_GCTHING", "UNEXPECTED", "UNEXPECTED", "UNEXPECTED",
+    "OBJECT"
+]
+def get_ff_type(tag):
+    try:
+        return FF_TYPES[index]
+    except IndexError:
+        return "UNKNOWN"
+
 if __name__ == '__main__':
-    fpath = '/home/z/Projects/open/v8/v8/src/objects.h'
+    fpath = '/home/z/projects/open/v8/v8/src/objects.h'
     analyzer = V8Analyzer(fpath)
     x = analyzer.process()
     #print(x)
